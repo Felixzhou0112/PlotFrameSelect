@@ -51,9 +51,9 @@ private:
 
 private:
     QMenu *m_contextMenu;
-    QMap<QString, QCPItemRect *> m_selectionRects;
-    std::vector<SelectArea_S> m_areaList;
-    QCPItemRect *m_currentRect;
+//    QMap<QString, QCPItemRect *> m_selectionRects;
+    QList<SelectArea_S> m_areaList;
+    SelectArea_S m_currentRect;
 
     bool m_selectState = false;         // 是否是框选状态
     bool m_selecting;                   // 是否是框选中

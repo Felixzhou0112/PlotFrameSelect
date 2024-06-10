@@ -154,11 +154,11 @@ void AnalysePlot::selectAreaBtnToggled(bool checked)
         setCursor(Qt::CustomCursor);
 
         // 删除所有矩形选区
-        for (auto rect : m_selectionRects)
+        for (auto rect : m_areaList)
         {
-            removeItem(rect);
+            removeItem(rect.area);
         }
-        m_selectionRects.clear();
+        m_areaList.clear();
         replot();
     }
     else
@@ -169,7 +169,7 @@ void AnalysePlot::selectAreaBtnToggled(bool checked)
 
 void AnalysePlot::contextMenuRequest(QPoint pos)
 {
-    if (m_selectState && !m_selectionRects.isEmpty())
+    if (m_selectState && !m_areaList.empty())
     {
         m_contextMenu->exec(mapToGlobal(pos));
     }
@@ -196,10 +196,10 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
         QPointF coordPoint(x, y);
 
         // 遍历选区看看右键有没有在选区中
-        for (auto iter = m_selectionRects.begin(); iter != m_selectionRects.end(); iter++)
+        for (int i = 0; i < m_areaList.size(); i++)
         {
-            QString uid = iter.key();
-            QCPItemRect *rect = iter.value();
+            QString uid = m_areaList[i].uid;
+            QCPItemRect *rect = m_areaList[i].area;
 
             QPointF topLeft = rect->topLeft->coords();
             QPointF bottomRight = rect->bottomRight->coords();
@@ -207,6 +207,7 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
             if (rectBounds.contains(coordPoint))
             {
                 m_selectedAreaUid = uid;
+                m_currentRect = m_areaList[i];
                 contextMenuRequest(event->pos());
             }
         }
@@ -217,17 +218,18 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
 
 void AnalysePlot::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_selecting && !m_selectionRects.isEmpty())
+    if (m_selecting && !m_areaList.empty())
     {
         m_selectionEnd = xAxis->pixelToCoord(event->pos().x());
+        m_currentRect.endPos = m_selectionEnd;
+
         if (m_selectionEnd < m_selectionStart)
         {
             std::swap(m_selectionStart, m_selectionEnd);
         }
 
-        QCPItemRect *currentRect = m_selectionRects.value(m_selectedAreaUid);
-        currentRect->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
-        currentRect->bottomRight->setCoords(m_selectionEnd, yAxis->range().lower);
+        m_currentRect.area->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
+        m_currentRect.area->bottomRight->setCoords(m_selectionEnd, yAxis->range().lower);
         replot();
     }
     QCustomPlot::mouseMoveEvent(event);
@@ -238,11 +240,9 @@ void AnalysePlot::mouseReleaseEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton)
     {
         m_selecting = false;
-
-
     }
 
-    if (m_selectState && !m_selectionRects.isEmpty())
+    if (m_selectState && !m_areaList.isEmpty())
     {
         scanSelectedAreaData(m_selectedAreaUid);
     }
@@ -326,8 +326,14 @@ void AnalysePlot::createSelectArea()
     newRect->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
     newRect->bottomRight->setCoords(m_selectionStart, yAxis->range().lower);
 
+    // 维护起来
+    m_currentRect.area = newRect;
+
     m_selectedAreaUid = QUuid::createUuid().toString().replace("{", "").replace("}", "");
-    m_selectionRects.insert(m_selectedAreaUid, newRect);
+    m_currentRect.uid = m_selectedAreaUid;
+    m_currentRect.startPos = m_selectionStart;
+
+    m_areaList.append(m_currentRect);
 }
 
 void AnalysePlot::setPlotInteraction(bool enable)
@@ -345,7 +351,23 @@ void AnalysePlot::setPlotInteraction(bool enable)
 
 void AnalysePlot::scanSelectedAreaData(const QString& uid)
 {
+    Q_UNUSED(uid);
+
     // 首先拿到这个选区
-    QCPItemRect* area = m_selectionRects.value(uid);
-    qDebug() << "选区左边" << area->topLeft->coords();
+    for (int i = 0; i < m_keys.size(); i++)
+    {
+        qDebug() << "11111:" << m_keys[i];
+        if (m_keys[i] >= m_currentRect.startPos)
+        {
+            qDebug() << "2222:" << m_keys[i] << m_currentRect.startPos;
+            m_currentRect.keys.push_back(m_keys[i]);
+        }
+
+        if (m_keys[i] > m_currentRect.endPos)
+        {
+            qDebug() << "34:";
+            break;
+        }
+    }
+    qDebug() << "选区:" << m_currentRect.keys.size();
 }
