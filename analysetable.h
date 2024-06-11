@@ -10,21 +10,23 @@
 #include <QStyledItemDelegate>
 #include "datetime.h"
 
-typedef struct {
-   DateTime startTime;  // 开始时间
-   DateTime endTime;    // 开始时间
-   int      tm;         // 测量持续时间
-   int      ts;         // 目标测量时间
-   float    leqT;       // 等效连续声级
-   float    Lmax;       // 最大声级
-   float    Lmin;       // 最小声级
-   float    L5;         // 累计百分比声级
-   float    L10;        // 累计百分比声级
-   float    L50;        // 累计百分比声级
-   float    L90;        // 累计百分比声级
-   float    L95;        // 累计百分比声级
-   float    SD;         // 样本标准差
-   float    SEL;        // 声暴露级
+typedef struct
+{
+    QString  uid;        // 数据 uid，用来对应选区的
+    DateTime startTime;  // 开始时间
+    DateTime endTime;    // 开始时间
+    int      tm;         // 测量持续时间
+    int      ts;         // 目标测量时间
+    float    LeqT;       // 等效连续声级
+    float    Lmax;       // 最大声级
+    float    Lmin;       // 最小声级
+    float    L5;         // 累计百分比声级
+    float    L10;        // 累计百分比声级
+    float    L50;        // 累计百分比声级
+    float    L90;        // 累计百分比声级
+    float    L95;        // 累计百分比声级
+    float    SD;         // 样本标准差
+    float    SEL;        // 声暴露级
 }LeqStat_S;
 
 class NoFocusDelegate : public QStyledItemDelegate

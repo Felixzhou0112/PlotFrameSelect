@@ -28,7 +28,8 @@ Widget::~Widget()
 
 void Widget::on_pushButton_clicked()
 {
-    QString lastPath= "D:/File/Code/qt_projects/Demo/QChartDemo/PlotFrameSelect/";
+//    QString lastPath= "D:/File/Code/qt_projects/Demo/QChartDemo/PlotFrameSelect/";
+    QString lastPath= "C:/Users/85789/Desktop/";
     QString filePath = QFileDialog::getOpenFileName(this,
                                             QApplication::translate("文件选择窗口", "选择文件"), //title
                                             lastPath, //path

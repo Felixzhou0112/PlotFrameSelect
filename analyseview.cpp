@@ -1,6 +1,5 @@
 #include "analyseview.h"
-#include "analyseplot.h"
-#include "analysetable.h"
+
 
 using namespace std;
 
@@ -23,6 +22,7 @@ AnalyseView::AnalyseView(QWidget *parent)
     // 曲线控件
     m_plot = new AnalysePlot(this);
     plotLayout->addWidget(m_plot);
+    connect(m_plot, &AnalysePlot::selectAreaFinish, this, &AnalyseView::calculateSelectAreaData);
 
     // 表格容器
     QWidget* tableContainer = new QWidget(this);
@@ -31,8 +31,8 @@ AnalyseView::AnalyseView(QWidget *parent)
     tableContainer->setLayout(tableLayout);
 
     // 表格控件
-    AnalyseTable* table = new AnalyseTable();
-    tableLayout->addWidget(table);
+    m_table = new AnalyseTable();
+    tableLayout->addWidget(m_table);
 
     layout->addWidget(plotContainer);
     layout->addWidget(tableContainer);
@@ -280,5 +280,97 @@ QJsonObject AnalyseView::analyDataLine(bool isCrossDay, QString dataLine, int co
         onePoint.insert(QString::number(cow), dataLine);
         return onePoint;
     }
+}
+
+void AnalyseView::calculateSelectAreaData()
+{
+    // 首先获取框选区域的数据
+    auto area = m_plot->currentArea();
+
+    // 开始计算数据
+    LeqStat_S data;
+
+    data.uid = area->uid;
+    data.startTime = DateTime(area->startTime.toStdString(), "-", " ", ":");
+    data.tm = area->tm;
+
+    // 计算最值
+    if (!area->instData.empty())
+    {
+        data.Lmax = calculateLmax(area->instData);
+        data.Lmin = calculateLmax(area->instData);
+    }
+
+    data.LeqT = calculateLmax(area->values);
+    data.L5 = calculateLmax(area->values);
+    data.L10 = calculateLmax(area->values);
+    data.L50 = calculateLmax(area->values);
+    data.L90 = calculateLmax(area->values);
+    data.L95 = calculateLmax(area->values);
+    data.SD = calculateLmax(area->values);
+    data.SEL = calculateLmax(area->values);
+
+    // 计算完毕添加到表格中去
+    m_table->addRow(data);
+}
+
+float AnalyseView::calculateLmax(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateLmin(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateLeqT(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateL5(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateL10(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateL50(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateL90(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateL95(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateSD(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
+}
+
+float AnalyseView::calculateSEL(std::vector<double> data)
+{
+    Q_UNUSED(data);
+    return 0;
 }
 

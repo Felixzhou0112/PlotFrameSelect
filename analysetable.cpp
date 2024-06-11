@@ -131,9 +131,9 @@ void AnalyseTable::addRow(LeqStat_S &stat)
 
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString("%1").arg(rowIndex + 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString(stat.startTime.datetime().c_str())));
-    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString(stat.endTime.datetime().c_str())));
-    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.ts)));
-    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.leqT, 'f', 1)));
+//    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString(stat.endTime.datetime().c_str())));
+    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.tm)));
+    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.LeqT, 'f', 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.Lmax, 'f', 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.Lmin, 'f', 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.L5, 'f', 1)));
@@ -199,8 +199,8 @@ void AnalyseTable::initTable()
     QStringList m_header;
     m_header<<QObject::tr("序号")
             <<QObject::tr("开始时间")
-            <<QObject::tr("结束时间")
-            <<QObject::tr("Ts(s)")
+//            <<QObject::tr("结束时间")
+            <<QObject::tr("Tm(s)")
             <<QObject::tr("Leq,T")
             <<QObject::tr("Lmax")
             <<QObject::tr("Lmin")
@@ -236,7 +236,7 @@ void AnalyseTable::initTable()
     this->setShowGrid(false);//隐藏表格线
 
     this->setColumnWidth(1, 150);
-    this->setColumnWidth(2, 150);
+//    this->setColumnWidth(2, 150);
 
     // set the item delegate to your table widget
     this->setItemDelegate(new NoFocusDelegate());

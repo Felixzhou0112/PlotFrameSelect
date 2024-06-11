@@ -9,7 +9,6 @@ AnalysePlot::AnalysePlot(QWidget *parent) : QCustomPlot(parent), m_contextMenu(n
     // 设置上下文菜单
     setupContextMenu();
     setContextMenuPolicy(Qt::CustomContextMenu);
-//    connect(this, &QCustomPlot::customContextMenuRequested, this, &AnalysePlot::contextMenuRequest);
 }
 
 void AnalysePlot::addData(const QVector<double>& keys, const QVector<double>& values)
@@ -43,6 +42,9 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
                 for (const QJsonValue &value : dataArray)
                 {
                     QJsonObject obj = value.toObject();
+
+                    // 解析开始时间
+                    m_startTime = obj["startTime"].toString();
 
                     // 解析时间戳
                     QString dateTimeStr = obj["dateTime"].toString();
@@ -78,8 +80,14 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
         return;
     }
 
+    // 绘制曲线
     this->graph(0)->setData(m_keys, m_leqValues);
 
+    // 计算 Tm
+    m_tm = m_keys.last() - m_keys.first();
+    qDebug() << "检查手动计算的 Tm：" << m_tm;
+
+    // 调整坐标轴范围
     this->xAxis->setRange(QCPRange(m_keys.first(), m_keys.last()));
     this->yAxis->setRange(QCPRange(yMin - 10, yMax + 10));
 
@@ -94,6 +102,11 @@ void AnalysePlot::setInstName(QString name)
 void AnalysePlot::setLeqtNmae(QString name)
 {
     m_leqtName = name;
+}
+
+SelectArea_S *AnalysePlot::currentArea()
+{
+    return m_currentArea;
 }
 
 void AnalysePlot::setupContextMenu()
@@ -156,7 +169,10 @@ void AnalysePlot::selectAreaBtnToggled(bool checked)
         // 删除所有矩形选区
         for (auto rect : m_areaList)
         {
-            removeItem(rect.area);
+            removeItem(rect->area);
+
+            delete rect;
+            rect = nullptr;
         }
         m_areaList.clear();
         replot();
@@ -198,8 +214,8 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
         // 遍历选区看看右键有没有在选区中
         for (int i = 0; i < m_areaList.size(); i++)
         {
-            QString uid = m_areaList[i].uid;
-            QCPItemRect *rect = m_areaList[i].area;
+            QString uid = m_areaList[i]->uid;
+            QCPItemRect *rect = m_areaList[i]->area;
 
             QPointF topLeft = rect->topLeft->coords();
             QPointF bottomRight = rect->bottomRight->coords();
@@ -207,7 +223,7 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
             if (rectBounds.contains(coordPoint))
             {
                 m_selectedAreaUid = uid;
-                m_currentRect = m_areaList[i];
+                m_currentArea = m_areaList[i];
                 contextMenuRequest(event->pos());
             }
         }
@@ -218,18 +234,19 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
 
 void AnalysePlot::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_selecting && !m_areaList.empty())
+    if (m_selecting && m_currentArea)
     {
         m_selectionEnd = xAxis->pixelToCoord(event->pos().x());
-        m_currentRect.endPos = m_selectionEnd;
-
         if (m_selectionEnd < m_selectionStart)
         {
             std::swap(m_selectionStart, m_selectionEnd);
         }
 
-        m_currentRect.area->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
-        m_currentRect.area->bottomRight->setCoords(m_selectionEnd, yAxis->range().lower);
+        m_currentArea->startPos = m_selectionStart;
+        m_currentArea->endPos = m_selectionEnd;
+
+        m_currentArea->area->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
+        m_currentArea->area->bottomRight->setCoords(m_selectionEnd, yAxis->range().lower);
         replot();
     }
     QCustomPlot::mouseMoveEvent(event);
@@ -239,14 +256,25 @@ void AnalysePlot::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton)
     {
-        m_selecting = false;
-    }
+        if (m_selecting)
+        {
+            m_selecting = false;
 
-    if (m_selectState && !m_areaList.isEmpty())
-    {
-        scanSelectedAreaData(m_selectedAreaUid);
-    }
+            // 如果框选的有效数据点小于 2 个，判断这个选区无效
+            if (scanSelectedAreaData(m_currentArea->uid) < 2)
+            {
+                removeItem(m_currentArea->area);
 
+                delete m_currentArea;
+                m_currentArea = nullptr;
+            }
+            else
+            {
+                m_areaList.append(m_currentArea);
+                emit selectAreaFinish();
+            }
+        }
+    }
 
     QCustomPlot::mouseReleaseEvent(event);
 }
@@ -319,6 +347,7 @@ void AnalysePlot::initPlot()
 
 void AnalysePlot::createSelectArea()
 {
+    // 新建一个框选区域
     QCPItemRect *newRect = new QCPItemRect(this);
     newRect->setPen(QPen(QColor(205, 205, 205, 100)));
     newRect->setBrush(QBrush(QColor(205, 205, 205, 100)));
@@ -327,13 +356,14 @@ void AnalysePlot::createSelectArea()
     newRect->bottomRight->setCoords(m_selectionStart, yAxis->range().lower);
 
     // 维护起来
-    m_currentRect.area = newRect;
+    m_currentArea = new SelectArea_S;
+    m_currentArea->startTime = m_startTime;
+    m_currentArea->tm = m_tm;
+    m_currentArea->area = newRect;
 
-    m_selectedAreaUid = QUuid::createUuid().toString().replace("{", "").replace("}", "");
-    m_currentRect.uid = m_selectedAreaUid;
-    m_currentRect.startPos = m_selectionStart;
-
-    m_areaList.append(m_currentRect);
+    // 生成唯一标识
+    m_currentArea->uid = QUuid::createUuid().toString().replace("{", "").replace("}", "");
+    m_currentArea->startPos = m_selectionStart;
 }
 
 void AnalysePlot::setPlotInteraction(bool enable)
@@ -349,25 +379,30 @@ void AnalysePlot::setPlotInteraction(bool enable)
     }
 }
 
-void AnalysePlot::scanSelectedAreaData(const QString& uid)
+int AnalysePlot::scanSelectedAreaData(const QString& uid)
 {
     Q_UNUSED(uid);
 
-    // 首先拿到这个选区
+    // 遍历曲线横坐标，找到所有在选区范围内的横坐标
     for (int i = 0; i < m_keys.size(); i++)
     {
-        qDebug() << "11111:" << m_keys[i];
-        if (m_keys[i] >= m_currentRect.startPos)
+        if (m_keys[i] >= m_currentArea->startPos)
         {
-            qDebug() << "2222:" << m_keys[i] << m_currentRect.startPos;
-            m_currentRect.keys.push_back(m_keys[i]);
+            m_currentArea->keys.push_back(m_keys[i]);
+            m_currentArea->values.push_back(m_data.value(m_keys[i]).value(m_leqtName).toDouble());
+
+            // 如果有瞬时数据，那么就筛选一下
+            if (!m_instName.isEmpty())
+            {
+                m_currentArea->instData.push_back(m_data.value(m_keys[i]).value(m_instName).toDouble());
+            }
         }
 
-        if (m_keys[i] > m_currentRect.endPos)
+        if (m_keys[i] > m_currentArea->endPos)
         {
-            qDebug() << "34:";
             break;
         }
     }
-    qDebug() << "选区:" << m_currentRect.keys.size();
+    qDebug() << "选中的有效数据点数量为:" << m_currentArea->keys.size();
+    return m_currentArea->keys.size();
 }
