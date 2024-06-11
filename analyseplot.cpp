@@ -22,8 +22,8 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
     QJsonParseError error;
     QJsonDocument doc = QJsonDocument::fromJson(jsonData.toUtf8(), &error);
 
-    double yMin = 0;
-    double yMax = 0;
+    m_yMin = 0;
+    m_yMax = 0;
 
     if (error.error == QJsonParseError::NoError)
     {
@@ -54,8 +54,8 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
                     // 解析 Leq,T
                     auto valueObj = obj["infoList"].toObject();
                     double leqValue = valueObj[m_leqtName].toString().toDouble();
-                    yMin = yMin > leqValue ? leqValue : yMin;// 保存最小值
-                    yMax = yMax < leqValue ? leqValue : yMax;// 保存最大值
+                    m_yMin = m_yMin > leqValue ? leqValue : m_yMin;// 保存最小值
+                    m_yMax = m_yMax < leqValue ? leqValue : m_yMax;// 保存最大值
 
                     m_keys.append(time);
                     m_leqValues.append(leqValue);
@@ -80,18 +80,16 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
         return;
     }
 
-    // 绘制曲线
-    this->graph(0)->setData(m_keys, m_leqValues);
+    // 保留一份原始数据
+    m_rawKeys = m_keys;
+    m_rawValues = m_leqValues;
 
     // 计算 Tm
     m_tm = m_keys.last() - m_keys.first();
     qDebug() << "检查手动计算的 Tm：" << m_tm;
 
-    // 调整坐标轴范围
-    this->xAxis->setRange(QCPRange(m_keys.first(), m_keys.last()));
-    this->yAxis->setRange(QCPRange(yMin - 10, yMax + 10));
-
-    replot();
+    // 绘制曲线
+    drawPlot();
 }
 
 void AnalysePlot::setInstName(QString name)
@@ -148,11 +146,28 @@ void AnalysePlot::modifyActionTriggered()
 void AnalysePlot::deleteActionTriggered()
 {
     qDebug() << "deleteActionTriggered" << m_selectedAreaUid;
+
+    // 找到选区中的数据并删除
+    int index = m_keys.indexOf(m_currentArea->keys.front());
+    int length = m_currentArea->keys.size();
+
+    m_keys.remove(index, length);
+    m_leqValues.remove(index, length);
+
+    deleteArea(m_currentArea->uid);
+
+    drawPlot();
 }
 
 void AnalysePlot::resetActionTriggered()
 {
     qDebug() << "resetActionTriggered" << m_selectedAreaUid;
+
+    // 恢复原始数据
+    m_keys = m_rawKeys;
+    m_leqValues = m_rawValues;
+
+    drawPlot();
 }
 
 void AnalysePlot::selectAreaBtnToggled(bool checked)
@@ -185,7 +200,7 @@ void AnalysePlot::selectAreaBtnToggled(bool checked)
 
 void AnalysePlot::contextMenuRequest(QPoint pos)
 {
-    if (m_selectState && !m_areaList.empty())
+    if (m_selectState)
     {
         m_contextMenu->exec(mapToGlobal(pos));
     }
@@ -224,9 +239,14 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
             {
                 m_selectedAreaUid = uid;
                 m_currentArea = m_areaList[i];
-                contextMenuRequest(event->pos());
+                changeContextMenuState(true);
+            }
+            else
+            {
+                changeContextMenuState(false);
             }
         }
+        contextMenuRequest(event->pos());
     }
 
     QCustomPlot::mousePressEvent(event);
@@ -386,6 +406,11 @@ int AnalysePlot::scanSelectedAreaData(const QString& uid)
     // 遍历曲线横坐标，找到所有在选区范围内的横坐标
     for (int i = 0; i < m_keys.size(); i++)
     {
+        if (m_keys[i] > m_currentArea->endPos)
+        {
+            break;
+        }
+
         if (m_keys[i] >= m_currentArea->startPos)
         {
             m_currentArea->keys.push_back(m_keys[i]);
@@ -397,12 +422,71 @@ int AnalysePlot::scanSelectedAreaData(const QString& uid)
                 m_currentArea->instData.push_back(m_data.value(m_keys[i]).value(m_instName).toDouble());
             }
         }
-
-        if (m_keys[i] > m_currentArea->endPos)
-        {
-            break;
-        }
     }
     qDebug() << "选中的有效数据点数量为:" << m_currentArea->keys.size();
     return m_currentArea->keys.size();
+}
+
+void AnalysePlot::changeContextMenuState(bool isArea)
+{
+    preciseAction->setEnabled(true);         // 精确选区
+    lowerPeekAction->setEnabled(isArea);       // 下调峰值
+    modifyAction->setEnabled(isArea);          // 修改数据
+    deleteAction->setEnabled(isArea);          // 删除数据
+    resetAction->setEnabled(true);           // 还原数据
+}
+
+void AnalysePlot::drawPlot()
+{
+    // 调整坐标轴范围
+    if (!m_keys.isEmpty())
+    {
+        this->xAxis->setRange(QCPRange(m_keys.first(), m_keys.last()));
+        this->yAxis->setRange(QCPRange(m_yMin - 10, m_yMax + 10));
+    }
+
+    this->graph(0)->setData(m_keys, m_leqValues);
+
+    replot();
+}
+
+void AnalysePlot::deleteArea(QString uid)
+{
+    for (int i = 0; i < m_areaList.size(); i++)
+    {
+        if (m_areaList[i]->uid == uid)
+        {
+            m_currentArea = m_areaList.takeAt(i);
+            removeItem(m_currentArea->area);
+            delete m_currentArea;
+            m_currentArea = nullptr;
+            break;
+        }
+    }
+}
+
+bool AnalysePlot::checkOverlap(QMouseEvent *event)
+{
+    // 将鼠标点击位置从像素坐标转换为图表坐标
+    double x = xAxis->pixelToCoord(event->pos().x());
+    double y = yAxis->pixelToCoord(event->pos().y());
+    QPointF coordPoint(x, y);
+    bool isOverlap = false;
+
+    // 遍历选区看看右键有没有在选区中
+    for (int i = 0; i < m_areaList.size(); i++)
+    {
+        QCPItemRect *rect = m_areaList[i]->area;
+
+        QPointF topLeft = rect->topLeft->coords();
+        QPointF bottomRight = rect->bottomRight->coords();
+        QRectF rectBounds = QRectF(topLeft, bottomRight);
+        if (rectBounds.contains(coordPoint))
+        {
+            isOverlap = true;
+            break;
+        }
+    }
+
+    return isOverlap;
 }

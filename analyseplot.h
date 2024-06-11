@@ -54,6 +54,10 @@ private:
     void createSelectArea();
     void setPlotInteraction(bool enable);
     int scanSelectedAreaData(const QString &uid);
+    void changeContextMenuState(bool isArea);
+    void drawPlot();
+    void deleteArea(QString uid);
+    bool checkOverlap(QMouseEvent *event);// 检查是否重叠
 
 private:
     QMenu *m_contextMenu;                       // 右键菜单
@@ -74,9 +78,13 @@ private:
 
     QString m_instName;             // 瞬时数据字段名
     QString m_leqtName;             // 等效声级数据名称
+    QVector<double> m_rawKeys;      // 曲线的横坐标（原始数据）
+    QVector<double> m_rawValues;    // 曲线的纵坐标（原始数据）
     QVector<double> m_keys;         // 曲线的横坐标
     QVector<double> m_leqValues;    // 曲线的纵坐标
     QMap<double, QJsonObject> m_data;   // 原始数据
+    double m_yMin = 0;
+    double m_yMax = 0;
 
     QString m_startTime;              // 测量开始时间
     int m_tm;                         // 测量持续时间
