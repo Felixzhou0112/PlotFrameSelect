@@ -20,6 +20,8 @@ void NoFocusDelegate::paint(QPainter* painter, const QStyleOptionViewItem & opti
 AnalyseTable::AnalyseTable(QWidget *parent) : QTableWidget (parent)
 {
     initTable();
+
+    connect(this, &QTableWidget::itemClicked, this, &AnalyseTable::slotRowClicked);
 }
 
 void AnalyseTable::updateTableData(int page)
@@ -144,6 +146,8 @@ void AnalyseTable::addRow(LeqStat_S &stat)
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(floor(stat.SD * 10) / 10, 'f', 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(floor(stat.SEL * 10) / 10, 'f', 1)));
 
+    this->item(rowIndex, 0)->setData(Qt::UserRole, stat.uid);
+
     for (int j = 0; j < columnCount(); j++)// 列居中
     {
         item(rowIndex, j)->setTextAlignment(Qt::AlignHCenter|Qt::AlignVCenter);
@@ -197,20 +201,20 @@ void AnalyseTable::initTable()
 {
     //表头对象
     QStringList m_header;
-    m_header<<QObject::tr("序号")
-            <<QObject::tr("开始时间")
-//            <<QObject::tr("结束时间")
-            <<QObject::tr("Tm(s)")
-            <<QObject::tr("Leq,T")
-            <<QObject::tr("Lmax")
-            <<QObject::tr("Lmin")
-            <<QObject::tr("L5")
-            <<QObject::tr("L10")
-            <<QObject::tr("L50")
-            <<QObject::tr("L90")
-            <<QObject::tr("L95")
-            <<QObject::tr("SD")
-            <<QObject::tr("SEL");
+    m_header<< QObject::tr("序号")
+            << QObject::tr("开始时间")
+//            << QObject::tr("结束时间")
+            << QObject::tr("Tm(s)")
+            << QObject::tr("Leq,T")
+            << QObject::tr("Lmax")
+            << QObject::tr("Lmin")
+            << QObject::tr("L5")
+            << QObject::tr("L10")
+            << QObject::tr("L50")
+            << QObject::tr("L90")
+            << QObject::tr("L95")
+            << QObject::tr("SD")
+            << QObject::tr("SEL");
 
     this->horizontalHeader()->setStyleSheet( "QHeaderView::section {background-color: rgb(244, 242, 243);"
                                              "padding-left: 5px;"
@@ -267,16 +271,17 @@ void AnalyseTable::slotBtnDetailClicked()
     auto name = btn->objectName();
     int colum = name.mid(3).toInt();
 
-    emit sigShowSpecifiedRowDetails(colum);
+//    emit sigShowSpecifiedRowDetails(colum);
 }
 
 void AnalyseTable::slotRowClicked(QTableWidgetItem *item)
 {
     int row = item->row();
     // 先拿到选中行的数据时间戳，并保存
-    auto timeItem = this->item(row, 1);
-    m_selectedItem = QDateTime::fromString(timeItem->text(), "yyyy-MM-dd hh:mm:ss").toSecsSinceEpoch();
+    auto timeItem = this->item(row, 0);
+    m_selectedUID = timeItem->data(Qt::UserRole).toString();
 
+    qDebug() << "选中的 uid：" << m_selectedUID;
     highLightSelectedRow();
 }
 
@@ -306,36 +311,16 @@ QWidget *AnalyseTable::createDetailBtn(int colum)
 
 void AnalyseTable::highLightSelectedRow()
 {
-    // 首先判断现有的数据中有没有选中行了，因为可能之前选中的被删了
-    bool flag = false;
-//    for (auto item : m_records)
-//    {
-//        if (item.time == m_selectedItem)
-//        {
-//            flag = true;
-//        }
-//    }
+    // 查看当前页有没有这个数据，有的话就选中
+    int rows = this->rowCount();
 
-    if (flag)
+    for (int i = 0; i < rows; i++)
     {
-        // 查看当前页有没有这个数据，有的话就选中
-        int rows = this->rowCount();
-
-        for (int i = 0; i < rows; i++)
+        auto item = this->item(i, 0);
+        if (m_selectedUID == item->data(Qt::UserRole).toString())
         {
-            auto item = this->item(i, 1);
-            auto temp = QDateTime::fromString(item->text(), "yyyy-MM-dd hh:mm:ss").toSecsSinceEpoch();
-            if (m_selectedItem == temp)
-            {
-                this->selectRow(item->row());
-                emit sigShowSpecifiedRowDetails(item->row());
-            }
+            this->selectRow(item->row());
+            emit sigShowSpecifiedRowArea(m_selectedUID);
         }
-    }
-    else
-    {
-        // 直接设置第一行选中
-        this->selectRow(0);
-        emit sigShowSpecifiedRowDetails(0);
     }
 }

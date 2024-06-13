@@ -26,13 +26,20 @@ AnalyseView::AnalyseView(QWidget *parent)
 
     // 表格容器
     QWidget* tableContainer = new QWidget(this);
-    QVBoxLayout* tableLayout = new QVBoxLayout(tableContainer);
+    QHBoxLayout* tableLayout = new QHBoxLayout(tableContainer);
     tableLayout->setContentsMargins(0, 0, 0, 0);
+    tableLayout->setSpacing(0);
     tableContainer->setLayout(tableLayout);
 
     // 表格控件
     m_table = new AnalyseTable();
+    connect(m_table, &AnalyseTable::sigShowSpecifiedRowArea, m_plot, &AnalysePlot::slotShowSpecifiedRowArea);
+
+    m_optTable = new OperationTable();
+    m_optTable->setMaximumWidth(150);
+
     tableLayout->addWidget(m_table);
+    tableLayout->addWidget(m_optTable);
 
     layout->addWidget(plotContainer);
     layout->addWidget(tableContainer);
@@ -312,6 +319,8 @@ void AnalyseView::calculateSelectAreaData()
 
     // 计算完毕添加到表格中去
     m_table->addRow(data);
+
+    m_optTable->addRow(area->uid);
 }
 
 float AnalyseView::calculateLmax(std::vector<double> data)

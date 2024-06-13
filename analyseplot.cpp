@@ -9,6 +9,11 @@ AnalysePlot::AnalysePlot(QWidget *parent) : QCustomPlot(parent), m_contextMenu(n
     // 设置上下文菜单
     setupContextMenu();
     setContextMenuPolicy(Qt::CustomContextMenu);
+
+    m_operationView = new OperationView();
+    connect(m_operationView, &OperationView::sigPreciseTimeRangeConfirm, this, &AnalysePlot::slotPreciseTimeRangeConfirm);
+    connect(m_operationView, &OperationView::sigLowerPeekValueConfirm, this, &AnalysePlot::slotLowerPeekValueConfirm);
+    connect(m_operationView, &OperationView::sigModifyValueConfirm, this, &AnalysePlot::slotModifyValueConfirm);
 }
 
 void AnalysePlot::addData(const QVector<double>& keys, const QVector<double>& values)
@@ -131,16 +136,22 @@ void AnalysePlot::setupContextMenu()
 void AnalysePlot::preciseActionTriggered()
 {
     qDebug() << "preciseActionTriggered" << m_selectedAreaUid;
+    m_operationView->setType(OperationView::OperationPricison);
+    m_operationView->show();
 }
 
 void AnalysePlot::lowerPeekActionTriggered()
 {
     qDebug() << "lowerPeekActionTriggered" << m_selectedAreaUid;
+    m_operationView->setType(OperationView::OperationPeek);
+    m_operationView->show();
 }
 
 void AnalysePlot::modifyActionTriggered()
 {
     qDebug() << "modifyActionTriggered" << m_selectedAreaUid;
+    m_operationView->setType(OperationView::OperationModify);
+    m_operationView->show();
 }
 
 void AnalysePlot::deleteActionTriggered()
@@ -198,6 +209,68 @@ void AnalysePlot::selectAreaBtnToggled(bool checked)
     }
 }
 
+void AnalysePlot::slotPreciseTimeRangeConfirm(qint64 start, qint64 end)
+{
+    // 先把时间戳转换成横坐标
+    m_selectionStart = start / 1000.0;
+    m_selectionEnd = end / 1000.0;
+
+    if (checkOverlap(m_selectionStart))
+    {
+        qDebug() << "选区重复！！";
+        return;
+    }
+
+    createSelectArea();
+
+    m_currentArea->startPos = m_selectionStart;
+    m_currentArea->endPos = m_selectionEnd;
+
+    m_currentArea->area->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
+    m_currentArea->area->bottomRight->setCoords(m_selectionEnd, yAxis->range().lower);
+
+    // 如果框选的有效数据点小于 2 个，判断这个选区无效
+    checkSelectAreaValid();
+
+    replot();
+}
+
+void AnalysePlot::slotLowerPeekValueConfirm(int value)
+{
+    // 首先给数据恢复精度，需要缩小 10 倍
+    float peekValue = value * 0.1;
+
+    // 然后遍历选区中的点，将所有峰值都改为设定值
+    for (auto item : m_currentArea->keys)
+    {
+        if (m_leqValues.value(m_keys.indexOf(item)) > peekValue)
+        {
+            m_leqValues[m_keys.indexOf(item)] = peekValue;
+        }
+    }
+
+    // 更新曲线
+    drawPlot();
+}
+
+void AnalysePlot::slotModifyValueConfirm(int value)
+{
+    // 首先给数据恢复精度，需要缩小 10 倍
+    float peekValue = value * 0.1;
+
+    // 然后遍历选区中的点，将所有峰值都加上设定值
+    for (auto item : m_currentArea->keys)
+    {
+        if (m_leqValues.value(m_keys.indexOf(item)) > peekValue)
+        {
+            m_leqValues[m_keys.indexOf(item)] += peekValue;
+        }
+    }
+
+    // 更新曲线
+    drawPlot();
+}
+
 void AnalysePlot::contextMenuRequest(QPoint pos)
 {
     if (m_selectState)
@@ -206,11 +279,20 @@ void AnalysePlot::contextMenuRequest(QPoint pos)
     }
 }
 
+void AnalysePlot::slotShowSpecifiedRowArea(QString uid)
+{
+    m_selectedAreaUid = uid;
+
+    updateAreasColor();
+}
+
 void AnalysePlot::mousePressEvent(QMouseEvent *event)
 {
+    bool isOverlap = checkOverlap(event);
+
     if (event->button() == Qt::LeftButton)
     {
-        if (m_selectState)
+        if (m_selectState && !isOverlap)
         {
             m_selecting = true;
             m_selectionStart = xAxis->pixelToCoord(event->pos().x());
@@ -221,30 +303,13 @@ void AnalysePlot::mousePressEvent(QMouseEvent *event)
 
     if (event->button() == Qt::RightButton)
     {
-        // 将鼠标点击位置从像素坐标转换为图表坐标
-        double x = xAxis->pixelToCoord(event->pos().x());
-        double y = yAxis->pixelToCoord(event->pos().y());
-        QPointF coordPoint(x, y);
-
-        // 遍历选区看看右键有没有在选区中
-        for (int i = 0; i < m_areaList.size(); i++)
+        if (isOverlap)
         {
-            QString uid = m_areaList[i]->uid;
-            QCPItemRect *rect = m_areaList[i]->area;
-
-            QPointF topLeft = rect->topLeft->coords();
-            QPointF bottomRight = rect->bottomRight->coords();
-            QRectF rectBounds = QRectF(topLeft, bottomRight);
-            if (rectBounds.contains(coordPoint))
-            {
-                m_selectedAreaUid = uid;
-                m_currentArea = m_areaList[i];
-                changeContextMenuState(true);
-            }
-            else
-            {
-                changeContextMenuState(false);
-            }
+            changeContextMenuState(true);
+        }
+        else
+        {
+            changeContextMenuState(false);
         }
         contextMenuRequest(event->pos());
     }
@@ -281,18 +346,7 @@ void AnalysePlot::mouseReleaseEvent(QMouseEvent *event)
             m_selecting = false;
 
             // 如果框选的有效数据点小于 2 个，判断这个选区无效
-            if (scanSelectedAreaData(m_currentArea->uid) < 2)
-            {
-                removeItem(m_currentArea->area);
-
-                delete m_currentArea;
-                m_currentArea = nullptr;
-            }
-            else
-            {
-                m_areaList.append(m_currentArea);
-                emit selectAreaFinish();
-            }
+            checkSelectAreaValid();
         }
     }
 
@@ -369,8 +423,8 @@ void AnalysePlot::createSelectArea()
 {
     // 新建一个框选区域
     QCPItemRect *newRect = new QCPItemRect(this);
-    newRect->setPen(QPen(QColor(205, 205, 205, 100)));
-    newRect->setBrush(QBrush(QColor(205, 205, 205, 100)));
+    newRect->setPen(QPen(m_selectColor));
+    newRect->setBrush(QBrush(m_selectColor));
 
     newRect->topLeft->setCoords(m_selectionStart, yAxis->range().upper);
     newRect->bottomRight->setCoords(m_selectionStart, yAxis->range().lower);
@@ -382,8 +436,11 @@ void AnalysePlot::createSelectArea()
     m_currentArea->area = newRect;
 
     // 生成唯一标识
-    m_currentArea->uid = QUuid::createUuid().toString().replace("{", "").replace("}", "");
+    m_selectedAreaUid = QUuid::createUuid().toString().replace("{", "").replace("}", "");
+    m_currentArea->uid = m_selectedAreaUid;
     m_currentArea->startPos = m_selectionStart;
+
+    updateAreasColor();
 }
 
 void AnalysePlot::setPlotInteraction(bool enable)
@@ -483,10 +540,74 @@ bool AnalysePlot::checkOverlap(QMouseEvent *event)
         QRectF rectBounds = QRectF(topLeft, bottomRight);
         if (rectBounds.contains(coordPoint))
         {
+            m_selectedAreaUid = m_areaList[i]->uid;
+            m_currentArea = m_areaList[i];
+
+            // 更新下选区颜色
+            updateAreasColor();
+
             isOverlap = true;
             break;
         }
     }
 
     return isOverlap;
+}
+
+bool AnalysePlot::checkOverlap(double startTime)
+{
+    bool isOverlap = false;
+
+    // 遍历选区看看右键有没有在选区中
+    for (int i = 0; i < m_areaList.size(); i++)
+    {
+        if (m_areaList[i]->startPos <= startTime && m_areaList[i]->endPos >= startTime)
+        {
+            isOverlap = true;
+            break;
+        }
+    }
+
+    return isOverlap;
+}
+
+void AnalysePlot::updateAreasColor()
+{
+    // 先找到对应的选区
+    for (auto item : m_areaList)
+    {
+        if (item->uid == m_selectedAreaUid)
+        {
+            m_currentArea = item;
+            m_currentArea->area->setPen(m_selectColor);
+            m_currentArea->area->setBrush(m_selectColor);
+        }
+        else
+        {
+            item->area->setPen(m_defaultColor);
+            item->area->setBrush(m_defaultColor);
+        }
+    }
+
+    replot();
+}
+
+bool AnalysePlot::checkSelectAreaValid()
+{
+    if (scanSelectedAreaData(m_currentArea->uid) < 2)
+    {
+        removeItem(m_currentArea->area);
+
+        delete m_currentArea;
+        m_currentArea = nullptr;
+
+        return false;
+    }
+    else
+    {
+        m_areaList.append(m_currentArea);
+        emit selectAreaFinish();
+
+        return true;
+    }
 }

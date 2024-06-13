@@ -3,6 +3,7 @@
 #include "qcustomplot.h"
 #include <QMenu>
 #include "crosslineplot.h"
+#include "operationview.h"
 
 
 struct SelectArea_S
@@ -34,6 +35,7 @@ signals:
 
 public slots:
     void contextMenuRequest(QPoint pos);
+    void slotShowSpecifiedRowArea(QString uid);
 
 private slots:
     void setupContextMenu();
@@ -43,6 +45,9 @@ private slots:
     void deleteActionTriggered();
     void resetActionTriggered();
     void selectAreaBtnToggled(bool checked);
+    void slotPreciseTimeRangeConfirm(qint64 start, qint64 end);
+    void slotLowerPeekValueConfirm(int value);
+    void slotModifyValueConfirm(int value);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -58,6 +63,9 @@ private:
     void drawPlot();
     void deleteArea(QString uid);
     bool checkOverlap(QMouseEvent *event);// 检查是否重叠
+    bool checkOverlap(double startTime);// 通过横坐标判断是否重叠
+    void updateAreasColor();// 更新区域颜色
+    bool checkSelectAreaValid();// 检查所选区域是否有效
 
 private:
     QMenu *m_contextMenu;                       // 右键菜单
@@ -92,6 +100,10 @@ private:
     QString m_selectedAreaUid = "";     // 右键要操作的选区 uid
 
     CrossLinePlot* m_crossLine = nullptr;// 鼠标追踪十字线
+    OperationView* m_operationView = nullptr;// 选区操作界面
+
+    QColor m_defaultColor = QColor(205, 205, 205, 100);
+    QColor m_selectColor = QColor(218, 235, 254, 100);
 };
 
 #endif // MYCHART_H

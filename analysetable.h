@@ -50,7 +50,7 @@ public slots:
     void slotEChartsDataClicked(qint64 time);
 
 signals:
-    void sigShowSpecifiedRowDetails(int row);
+    void sigShowSpecifiedRowArea(QString uid);
     void sigChangeCurrentPage(int page);
 
 private slots:
@@ -67,6 +67,7 @@ private:
     QMap<QString, QCheckBox*> m_checkList;
     QMap<QString, QPushButton*> m_detailList;
     qint64 m_selectedItem;// 被选中的某个数据记录的时间戳
+    QString m_selectedUID;// 被选中的某条数据的 UID
 
 };
 

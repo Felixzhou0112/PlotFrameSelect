@@ -4,6 +4,7 @@
 #include <QWidget>
 #include "analyseplot.h"
 #include "analysetable.h"
+#include "operationtable.h"
 
 class AnalyseView : public QWidget
 {
@@ -43,6 +44,7 @@ private:
 private:
     AnalysePlot* m_plot = nullptr;
     AnalyseTable* m_table = nullptr;
+    OperationTable* m_optTable = nullptr;
     QString m_strDataJson;// 瞬时数据 Json 字符串
     QStringList m_dataNameList; // 数据名称
     QStringList m_insDataName;// 瞬时数据名称列表

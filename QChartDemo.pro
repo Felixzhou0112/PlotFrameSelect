@@ -22,6 +22,8 @@ SOURCES += \
     crosslineplot.cpp \
     datetime.cpp \
     main.cpp \
+    operationtable.cpp \
+    operationview.cpp \
     qcustomplot.cpp \
     widget.cpp
 
@@ -31,6 +33,8 @@ HEADERS += \
     analyseview.h \
     crosslineplot.h \
     datetime.h \
+    operationtable.h \
+    operationview.h \
     qcustomplot.h \
     widget.h
 
@@ -40,4 +44,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 FORMS += \
+    operationview.ui \
     widget.ui
