@@ -39,6 +39,7 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
                 // 清空数据
                 m_keys.clear();
                 m_leqValues.clear();
+                m_instValues.clear();
 
                 // 解析数据
                 QJsonObject jsonObject = doc.object();
@@ -58,12 +59,14 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
 
                     // 解析 Leq,T
                     auto valueObj = obj["infoList"].toObject();
-                    double leqValue = valueObj[m_leqtName].toString().toDouble();
-                    m_yMin = m_yMin > leqValue ? leqValue : m_yMin;// 保存最小值
-                    m_yMax = m_yMax < leqValue ? leqValue : m_yMax;// 保存最大值
+                    double leqtValue = valueObj[m_leqtName].toString().toDouble();
+                    double instValue = valueObj[m_instName].toString().toDouble();
+                    m_yMin = m_yMin > leqtValue ? leqtValue : m_yMin;// 保存最小值
+                    m_yMax = m_yMax < leqtValue ? leqtValue : m_yMax;// 保存最大值
 
                     m_keys.append(time);
-                    m_leqValues.append(leqValue);
+                    m_leqValues.append(leqtValue);
+                    m_instValues.append(instValue);
                     m_data.insert(time, valueObj);
                 }
             }
@@ -85,13 +88,18 @@ void AnalysePlot::loadDataFromJson(const QString &jsonData)
         return;
     }
 
+    // 生成唯一标识
+    m_mainAreaUid = QUuid::createUuid().toString().replace("{", "").replace("}", "");
+
     // 保留一份原始数据
     m_rawKeys = m_keys;
     m_rawValues = m_leqValues;
 
     // 计算 Tm
     m_tm = m_keys.last() - m_keys.first();
-    qDebug() << "检查手动计算的 Tm：" << m_tm;
+
+    // 进行二次计算
+    emit plotDataLoadFinish();
 
     // 绘制曲线
     drawPlot();
@@ -110,6 +118,31 @@ void AnalysePlot::setLeqtNmae(QString name)
 SelectArea_S *AnalysePlot::currentArea()
 {
     return m_currentArea;
+}
+
+QString AnalysePlot::mainUid()
+{
+    return m_mainAreaUid;
+}
+
+QString AnalysePlot::startTime()
+{
+    return m_startTime;
+}
+
+int AnalysePlot::tm()
+{
+    return m_tm;
+}
+
+QVector<double> &AnalysePlot::leqtData()
+{
+    return m_leqValues;
+}
+
+QVector<double> &AnalysePlot::instData()
+{
+    return m_instValues;
 }
 
 void AnalysePlot::setupContextMenu()
@@ -284,6 +317,11 @@ void AnalysePlot::slotShowSpecifiedRowArea(QString uid)
     m_selectedAreaUid = uid;
 
     updateAreasColor();
+}
+
+void AnalysePlot::slotDeleteArea(QString uid)
+{
+    deleteArea(uid);
 }
 
 void AnalysePlot::mousePressEvent(QMouseEvent *event)
@@ -520,6 +558,8 @@ void AnalysePlot::deleteArea(QString uid)
             break;
         }
     }
+
+    replot();
 }
 
 bool AnalysePlot::checkOverlap(QMouseEvent *event)

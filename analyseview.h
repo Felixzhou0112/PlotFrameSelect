@@ -26,6 +26,7 @@ protected:
 
 private slots:
     void calculateSelectAreaData();
+    void calculateTotalData();
 
 private:
     QJsonObject analyDataLine(bool isCrossDay,QString dataLine, int cow, int dataCow, QStringList &InstantDataName, QString& measureData);

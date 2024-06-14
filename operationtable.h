@@ -21,12 +21,18 @@ public:
     OperationTable(QWidget *parent = nullptr);
     void addRow(QString uid);
 
+
+signals:
+    void sigDeleteTableData(QString uid);
+    void sigStoreTableData(QString uid);
+
 private slots:
     void slotDeleteBtnClicked();
     void slotCollectBtnClicked();
 
 private:
     void initTable();
+    void destroyBtn(QString uid);
 
     QList<QPushButton*> m_btnDeleteList; // 删除按钮列表
     QList<QPushButton*> m_btnCollectList;// 收藏按钮列表

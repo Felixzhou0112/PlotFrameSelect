@@ -23,6 +23,7 @@ AnalyseView::AnalyseView(QWidget *parent)
     m_plot = new AnalysePlot(this);
     plotLayout->addWidget(m_plot);
     connect(m_plot, &AnalysePlot::selectAreaFinish, this, &AnalyseView::calculateSelectAreaData);
+    connect(m_plot, &AnalysePlot::plotDataLoadFinish, this, &AnalyseView::calculateTotalData);
 
     // 表格容器
     QWidget* tableContainer = new QWidget(this);
@@ -37,6 +38,8 @@ AnalyseView::AnalyseView(QWidget *parent)
 
     m_optTable = new OperationTable();
     m_optTable->setMaximumWidth(150);
+    connect(m_optTable, &OperationTable::sigDeleteTableData, m_table, &AnalyseTable::slotDeleteTableData);
+    connect(m_optTable, &OperationTable::sigDeleteTableData, m_plot, &AnalysePlot::slotDeleteArea);
 
     tableLayout->addWidget(m_table);
     tableLayout->addWidget(m_optTable);
@@ -321,6 +324,39 @@ void AnalyseView::calculateSelectAreaData()
     m_table->addRow(data);
 
     m_optTable->addRow(area->uid);
+}
+
+void AnalyseView::calculateTotalData()
+{
+    // 开始计算数据
+    LeqStat_S data;
+    std::vector<double> instData = std::vector<double>(m_plot->instData().begin(), m_plot->instData().end());
+    std::vector<double> leqtData = std::vector<double>(m_plot->leqtData().begin(), m_plot->leqtData().end());
+
+    data.uid = m_plot->mainUid();
+    data.startTime = DateTime(m_plot->startTime().toStdString(), "-", " ", ":");
+    data.tm = m_plot->tm();
+
+    // 计算最值
+    if (!m_plot->instData().empty())
+    {
+        data.Lmax = calculateLmax(instData);
+        data.Lmin = calculateLmax(instData);
+    }
+
+    data.LeqT = calculateLmax(leqtData);
+    data.L5 = calculateLmax(leqtData);
+    data.L10 = calculateLmax(leqtData);
+    data.L50 = calculateLmax(leqtData);
+    data.L90 = calculateLmax(leqtData);
+    data.L95 = calculateLmax(leqtData);
+    data.SD = calculateLmax(leqtData);
+    data.SEL = calculateLmax(leqtData);
+
+    // 计算完毕添加到表格中去
+    m_table->addRow(data);
+
+    m_optTable->addRow(data.uid);
 }
 
 float AnalyseView::calculateLmax(std::vector<double> data)

@@ -29,13 +29,20 @@ public:
     void setInstName(QString name);
     void setLeqtNmae(QString name);
     SelectArea_S* currentArea();
+    QString mainUid();
+    QString startTime();
+    int tm();
+    QVector<double>& leqtData();
+    QVector<double>& instData();
 
 signals:
     void selectAreaFinish();// 框选结束信号，用来进行二次计算
+    void plotDataLoadFinish();// 曲线数据加载完毕，需要进行计算
 
 public slots:
     void contextMenuRequest(QPoint pos);
     void slotShowSpecifiedRowArea(QString uid);
+    void slotDeleteArea(QString uid);
 
 private slots:
     void setupContextMenu();
@@ -90,6 +97,7 @@ private:
     QVector<double> m_rawValues;    // 曲线的纵坐标（原始数据）
     QVector<double> m_keys;         // 曲线的横坐标
     QVector<double> m_leqValues;    // 曲线的纵坐标
+    QVector<double> m_instValues;    // 瞬时数据
     QMap<double, QJsonObject> m_data;   // 原始数据
     double m_yMin = 0;
     double m_yMax = 0;
@@ -97,6 +105,7 @@ private:
     QString m_startTime;              // 测量开始时间
     int m_tm;                         // 测量持续时间
 
+    QString m_mainAreaUid = "";     // 整个区域的 uid
     QString m_selectedAreaUid = "";     // 右键要操作的选区 uid
 
     CrossLinePlot* m_crossLine = nullptr;// 鼠标追踪十字线

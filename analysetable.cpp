@@ -130,8 +130,11 @@ void AnalyseTable::addRow(LeqStat_S &stat)
     // 设置数据行
     int rowIndex = rowCount() - 1;
     int colIndex = 0;
+    QString name = "";
 
-    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString("%1").arg(rowIndex + 1)));
+    name = rowIndex == 0 ? "全部" : QString("区域%1").arg(rowIndex);
+
+    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(name));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString(stat.startTime.datetime().c_str())));
 //    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString(stat.endTime.datetime().c_str())));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.tm)));
@@ -194,14 +197,30 @@ void AnalyseTable::slotEChartsDataClicked(qint64 time)
 //        {
 //            this->selectRow(item->row());
 //        }
-//    }
+    //    }
+}
+
+void AnalyseTable::slotDeleteTableData(QString uid)
+{
+    // 查看当前页有没有这个数据，有的话就移除
+    int rows = this->rowCount();
+
+    for (int i = 0; i < rows; i++)
+    {
+        auto item = this->item(i, 0);
+        if (uid == item->data(Qt::UserRole).toString())
+        {
+            this->removeRow(i);
+            return;
+        }
+    }
 }
 
 void AnalyseTable::initTable()
 {
     //表头对象
     QStringList m_header;
-    m_header<< QObject::tr("序号")
+    m_header<< QObject::tr("")
             << QObject::tr("开始时间")
 //            << QObject::tr("结束时间")
             << QObject::tr("Tm(s)")

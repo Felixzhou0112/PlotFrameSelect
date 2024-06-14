@@ -29,6 +29,11 @@ void OperationTable::addRow(QString uid)
     int rowIndex = rowCount() - 1;
     int colIndex = 0;
 
+    if (rowIndex == 0)
+    {
+        return ;
+    }
+
     QPushButton* btnDel = new QPushButton("删除");
     btnDel->setObjectName(uid);
     m_btnDeleteList.append(btnDel);
@@ -46,13 +51,30 @@ void OperationTable::addRow(QString uid)
 void OperationTable::slotDeleteBtnClicked()
 {
     auto btn = sender();
-    qDebug() << "delete uid:" << btn->objectName();
+    QString uid = btn->objectName();
+
+    // 查看当前页有没有这个数据，有的话就移除
+    int rows = this->rowCount();
+
+    for (int i = 0; i < rows; i++)
+    {
+        auto item = this->cellWidget(i, 0);
+        if (uid == item->objectName())
+        {
+            this->removeRow(i);
+            destroyBtn(uid);
+            emit sigDeleteTableData(uid);
+            return;
+        }
+    }
 }
 
 void OperationTable::slotCollectBtnClicked()
 {
     auto btn = sender();
-    qDebug() << "delete uid:" << btn->objectName();
+    QString uid = btn->objectName();
+    qDebug() << "store uid:" << uid;
+    emit sigStoreTableData(uid);
 }
 
 void OperationTable::initTable()
@@ -84,4 +106,23 @@ void OperationTable::initTable()
 
     // set the item delegate to your table widget
     this->setItemDelegate(new Delegate());
+}
+
+void OperationTable::destroyBtn(QString uid)
+{
+    for (int i = 0; i < m_btnDeleteList.size(); i++)
+    {
+        if (m_btnDeleteList.at(i)->objectName() == uid)
+        {
+            auto btn = m_btnDeleteList.takeAt(i);
+            delete btn;
+            btn = nullptr;
+
+            btn = m_btnCollectList.takeAt(i);
+            delete btn;
+            btn = nullptr;
+
+            break;
+        }
+    }
 }

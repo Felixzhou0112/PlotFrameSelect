@@ -48,6 +48,7 @@ public:
 
 public slots:
     void slotEChartsDataClicked(qint64 time);
+    void slotDeleteTableData(QString uid);
 
 signals:
     void sigShowSpecifiedRowArea(QString uid);
