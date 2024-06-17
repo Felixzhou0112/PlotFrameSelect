@@ -145,6 +145,21 @@ QVector<double> &AnalysePlot::instData()
     return m_instValues;
 }
 
+std::vector<double> AnalysePlot::leqtDataStd()
+{
+    return std::vector<double>(m_leqValues.begin(), m_leqValues.end());
+}
+
+std::vector<double> AnalysePlot::instDataStd()
+{
+    return std::vector<double>(m_instValues.begin(), m_instValues.end());
+}
+
+std::vector<double> AnalysePlot::keyDataStd()
+{
+    return std::vector<double>(m_rawKeys.begin(), m_rawKeys.end());
+}
+
 void AnalysePlot::setupContextMenu()
 {
     preciseAction = new QAction("精确选区", this);         // 精确选区
@@ -509,16 +524,16 @@ int AnalysePlot::scanSelectedAreaData(const QString& uid)
         if (m_keys[i] >= m_currentArea->startPos)
         {
             m_currentArea->keys.push_back(m_keys[i]);
-            m_currentArea->values.push_back(m_data.value(m_keys[i]).value(m_leqtName).toDouble());
+            m_currentArea->values.push_back(m_data.value(m_keys[i]).value(m_leqtName).toVariant().toDouble() + 0.0005);
 
             // 如果有瞬时数据，那么就筛选一下
             if (!m_instName.isEmpty())
             {
-                m_currentArea->instData.push_back(m_data.value(m_keys[i]).value(m_instName).toDouble());
+                m_currentArea->instData.push_back(m_data.value(m_keys[i]).value(m_instName).toVariant().toDouble() + 0.0005);
             }
         }
     }
-    qDebug() << "选中的有效数据点数量为:" << m_currentArea->keys.size();
+    qDebug() << "选中的有效数据点数量为:" << m_currentArea->values.size();
     return m_currentArea->keys.size();
 }
 

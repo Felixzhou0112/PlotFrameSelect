@@ -6,6 +6,26 @@
 #include "analysetable.h"
 #include "operationtable.h"
 
+
+//输出数据结构体，单位dB
+typedef struct
+{
+        float L5;
+        float L10;
+        float L50;
+        float L90;
+        float L95;
+        float SD;
+
+        float graphDataDis[151]; //统计分布图数据  graphDataDis[0]表示0dB占了所有数据的百分比，后面的数据以此类推。   graphDataDis[150]为最大百分比。
+        float graphDataCum[150]; //累积分布图数据  graphDataCum[0]表示大于0dB的数据占的百分比，后面的数据以此类推。
+
+        int rate;  //数据率  //1000表示100.0%
+        int validRate;  //数据有效率 //1000表示100.0%
+
+}Statistics_OutTypeDef;
+
+
 class AnalyseView : public QWidget
 {
     Q_OBJECT
@@ -31,16 +51,10 @@ private slots:
 private:
     QJsonObject analyDataLine(bool isCrossDay,QString dataLine, int cow, int dataCow, QStringList &InstantDataName, QString& measureData);
 
-    float calculateLmax(std::vector<double> data);
-    float calculateLmin(std::vector<double> data);
-    float calculateLeqT(std::vector<double> data);
-    float calculateL5(std::vector<double> data);
-    float calculateL10(std::vector<double> data);
-    float calculateL50(std::vector<double> data);
-    float calculateL90(std::vector<double> data);
-    float calculateL95(std::vector<double> data);
-    float calculateSD(std::vector<double> data);
-    float calculateSEL(std::vector<double> data);
+    void calculateStaData(LeqStat_S *stat, std::vector<double> data);
+    void calculateMostValue(LeqStat_S *stat, std::vector<double> data);
+    void calculateLeqT(LeqStat_S *stat, std::vector<double> data);
+    void calculateSEL(LeqStat_S *stat, float t);
 
 private:
     AnalysePlot* m_plot = nullptr;

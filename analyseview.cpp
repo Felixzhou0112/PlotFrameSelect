@@ -1,5 +1,16 @@
 #include "analyseview.h"
+#include <QLibrary>
+#include <iostream>
 
+
+//创建函数指针与需加载的函数对应 typedef 返回值 (*函数指针名)(入参)
+typedef char (*fun_read_cpuid)(char* out, int* outLen);//读cpuid
+typedef char (*fun_read_license)(char* lic, int len);//读序列号
+typedef int (*fun_statistic_init)(int windowNo, Statistics_OutTypeDef* statistics_out_var);//统计分析初始化
+typedef void (*fun_statistic_analyze)(int windowNo, float lp);//进行统计
+typedef void (*fun_getStatisticData)(int windowNo, Statistics_OutTypeDef* statistics_out_var);//获取统计结果
+
+#define EXCUTE_SUSSESS 1
 
 using namespace std;
 
@@ -292,6 +303,110 @@ QJsonObject AnalyseView::analyDataLine(bool isCrossDay, QString dataLine, int co
     }
 }
 
+void AnalyseView::calculateStaData(LeqStat_S* stat, std::vector<double> data)
+{
+    QString pathDll = QString("%1/%2").arg(qApp->applicationDirPath()).arg("MakeAWALib.dll");
+    qDebug() << pathDll;
+
+    QLibrary myLib(pathDll);
+    //判断是否加载成功
+    if(myLib.load())
+    {
+        char cpuid[100] = {0};
+        char lic[100] = {0};
+        int  len = 0;
+        int  rescode = 0;//1成功, 0失败
+
+        fun_read_cpuid read_cpuid = (fun_read_cpuid) myLib.resolve("read_cpuid");
+        if (read_cpuid)
+        {
+            rescode = read_cpuid(cpuid, &len);
+            if(rescode != EXCUTE_SUSSESS)
+            {
+                return;
+            }
+        }
+
+        sprintf(lic, "license:%s","RciFHQLTGdBkxatH6EyAiC9FXv/vlGNbDTM0b6K0hhii4QMbfgCBh7WzzD07cBDcnlA+IDj/ggk=");//拿到授权软
+
+        fun_read_license read_license = (fun_read_license) myLib.resolve("read_license");
+        if (read_license)
+        {
+             rescode = read_license(lic, strlen(lic));//进行授权
+             if(rescode != EXCUTE_SUSSESS)
+             {
+                 return;
+             }
+        }
+
+        Statistics_OutTypeDef statistics_out_var;
+        fun_statistic_init statistic_init = (fun_statistic_init) myLib.resolve("statistic_init");
+        if (statistic_init)
+        {
+             rescode = statistic_init(0, &statistics_out_var);//进行授权
+             if(rescode != EXCUTE_SUSSESS)
+             {
+                 return;
+             }
+        }
+
+        fun_statistic_analyze statistic_analyze = (fun_statistic_analyze) myLib.resolve("statistic_analyze");
+        if (statistic_analyze)
+        {
+            float laf = 0;
+            int size = data.size();
+            for (int i = 0; i < size; i++)//totle改成num_end
+            {
+                 laf = data[i];
+                 statistic_analyze(0, laf);//进行分析
+
+            }
+        }
+
+        fun_getStatisticData getStatisticData = (fun_getStatisticData) myLib.resolve("getStatisticData");
+        if (getStatisticData)
+        {
+             getStatisticData(0, &statistics_out_var);//获取分析结果
+        }
+
+        stat->L5 = statistics_out_var.L5;
+        stat->L10 = statistics_out_var.L10;
+        stat->L50 = statistics_out_var.L50;
+        stat->L90 = statistics_out_var.L90;
+        stat->L95 = statistics_out_var.L95;
+        stat->SD = statistics_out_var.SD;
+
+        qDebug() << "Lib L5:" << stat->L5;
+        qDebug() << "Lib L10:" << stat->L10;
+        qDebug() << "Lib L50:" << stat->L50;
+        qDebug() << "Lib L90:" << stat->L90;
+        qDebug() << "Lib L95:" << stat->L95;
+        qDebug() << "Lib SD:" << stat->SD;
+        qDebug() << "Lib SEL:" << stat->SEL;
+
+        myLib.unload();
+    }
+    else
+    {
+        qDebug() << "load DLL failed !";
+    }
+}
+
+void AnalyseView::calculateMostValue(LeqStat_S *stat, std::vector<double> data)
+{
+    if (!data.empty())
+    {
+        stat->Lmax = data.front();
+        stat->Lmin = data.front();
+    }
+
+    for (auto item : data)
+    {
+        stat->Lmin = stat->Lmin > item ? item : stat->Lmin;
+        stat->Lmax = stat->Lmax < item ? item : stat->Lmax;
+    }
+}
+
 void AnalyseView::calculateSelectAreaData()
 {
     // 首先获取框选区域的数据
@@ -303,22 +418,30 @@ void AnalyseView::calculateSelectAreaData()
     data.uid = area->uid;
     data.startTime = DateTime(area->startTime.toStdString(), "-", " ", ":");
     data.tm = area->tm;
+    double interval = 0;
 
-    // 计算最值
-    if (!area->instData.empty())
+    if (!area->keys.empty())
     {
-        data.Lmax = calculateLmax(area->instData);
-        data.Lmin = calculateLmax(area->instData);
+        interval = area->keys.at(1) - area->keys.at(0);
+        interval *= 1000;
     }
 
-    data.LeqT = calculateLmax(area->values);
-    data.L5 = calculateLmax(area->values);
-    data.L10 = calculateLmax(area->values);
-    data.L50 = calculateLmax(area->values);
-    data.L90 = calculateLmax(area->values);
-    data.L95 = calculateLmax(area->values);
-    data.SD = calculateLmax(area->values);
-    data.SEL = calculateLmax(area->values);
+    float t = interval * area->values.size();
+
+    if (!area->instData.empty())
+    {
+        // 计算最值
+        calculateMostValue(&data, area->instData);
+
+        // 计算统计数据
+        calculateStaData(&data, area->instData);
+    }
+
+    // 计算 Leq,T
+    calculateLeqT(&data, area->values);
+
+    // 计算 SEL
+    calculateSEL(&data, t);
 
     // 计算完毕添加到表格中去
     m_table->addRow(data);
@@ -336,22 +459,31 @@ void AnalyseView::calculateTotalData()
     data.uid = m_plot->mainUid();
     data.startTime = DateTime(m_plot->startTime().toStdString(), "-", " ", ":");
     data.tm = m_plot->tm();
+    double interval = 0;
 
-    // 计算最值
-    if (!m_plot->instData().empty())
+    if (!m_plot->keyDataStd().empty())
     {
-        data.Lmax = calculateLmax(instData);
-        data.Lmin = calculateLmax(instData);
+        interval = m_plot->keyDataStd()[1] - m_plot->keyDataStd()[0] + 0.0005;
+        interval *= 1000;
     }
 
-    data.LeqT = calculateLmax(leqtData);
-    data.L5 = calculateLmax(leqtData);
-    data.L10 = calculateLmax(leqtData);
-    data.L50 = calculateLmax(leqtData);
-    data.L90 = calculateLmax(leqtData);
-    data.L95 = calculateLmax(leqtData);
-    data.SD = calculateLmax(leqtData);
-    data.SEL = calculateLmax(leqtData);
+    float t = interval * m_plot->leqtDataStd().size();
+
+    // 计算最值和统计相关指标
+    if (!m_plot->instData().empty())
+    {
+        // 计算最值
+        calculateMostValue(&data, m_plot->instDataStd());
+
+        // 计算统计数据
+        calculateStaData(&data, m_plot->instDataStd());
+    }
+
+    // 计算 Leq,T
+    calculateLeqT(&data, m_plot->leqtDataStd());
+
+    // 计算 SEL
+    calculateSEL(&data, t);
 
     // 计算完毕添加到表格中去
     m_table->addRow(data);
@@ -359,63 +491,21 @@ void AnalyseView::calculateTotalData()
     m_optTable->addRow(data.uid);
 }
 
-float AnalyseView::calculateLmax(std::vector<double> data)
+void AnalyseView::calculateLeqT(LeqStat_S *stat, std::vector<double> data)
 {
-    Q_UNUSED(data);
-    return 0;
+    int n = data.size();
+    double sum = 0.0;
+    for(int i = 1; i <= n; ++i)
+    {
+        sum += pow(10.0, 0.1 * data[i]); // 注意这里的指数运算符需要使用双精度浮点数来确保准确性
+    }
+    stat->LeqT = 10.0 * log10(sum / n);
+
+    qDebug() << "calculate LeqT = " << stat->LeqT;
 }
 
-float AnalyseView::calculateLmin(std::vector<double> data)
+void AnalyseView::calculateSEL(LeqStat_S *stat, float t)
 {
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateLeqT(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateL5(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateL10(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateL50(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateL90(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateL95(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateSD(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
-}
-
-float AnalyseView::calculateSEL(std::vector<double> data)
-{
-    Q_UNUSED(data);
-    return 0;
+    stat->SEL = stat->LeqT +  10.0 * log10(t);
 }
 

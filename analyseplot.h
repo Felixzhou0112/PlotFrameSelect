@@ -34,6 +34,9 @@ public:
     int tm();
     QVector<double>& leqtData();
     QVector<double>& instData();
+    std::vector<double> leqtDataStd();
+    std::vector<double> instDataStd();
+    std::vector<double> keyDataStd();
 
 signals:
     void selectAreaFinish();// 框选结束信号，用来进行二次计算
