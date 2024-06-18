@@ -305,6 +305,167 @@ QJsonObject AnalyseView::analyDataLine(bool isCrossDay, QString dataLine, int co
 
 void AnalyseView::calculateStaData(LeqStat_S* stat, std::vector<double> data)
 {
+    int n2 = 0;
+    int data_num[1700] = {0};
+    float value_la = 0;
+    float sum = 0;
+    float totalLa = 0;
+    //辅助计算统计值用
+    float lmax = 0;
+    float lmin = 1000;
+    int size = data.size();
+
+    sum += pow(10, value_la * 0.1f);
+    totalLa += value_la;
+
+    /*
+     * 计算lmax，lmin, leqT, SD(样本标准差), Lae(SEL)
+    */
+    for (int i = 0; i < size; i++)//totle改成num_end
+    {
+        value_la = data[i];
+        data_num[int(value_la * 10)]++;//统计分析需要
+        if (value_la > lmax)
+        {
+            lmax = value_la;
+        }
+        if (value_la < lmin)
+        {
+            lmin = value_la;
+        }
+
+        sum += pow(10, data[i] * 0.1f);
+        totalLa += value_la;
+        n2++;
+    }
+
+//    float leqT = 10 * log10(sum / n2);//长时间计权值
+
+    //float leqT = 10*log10(sum / n2);//长时间计权值
+    double avgLa = totalLa / n2;//平均声压级别
+
+    float sd = 0;
+    float la = 0;
+    for (int i = 0; i < size; i++)//totle改成num_end
+    {
+        la = data[i];
+        sd += pow(la - avgLa, 2);
+    }
+
+    sd = (float)sqrt(sd / (n2 - 1));//样本标准差
+
+    qDebug() << "sd ======= " << sd;
+
+    /*
+     * 计算累计百分比
+    */
+    int jifenshijian2 = n2;
+    int temp_L5 = jifenshijian2 * 95 / 100;
+    int temp_L10 = jifenshijian2 * 9 / 10;
+    int temp_L50 = jifenshijian2 / 2;
+    int temp_L90 = jifenshijian2 / 10;
+    int temp_L95 = jifenshijian2 * 5 / 100;
+    int temp_count = 0;
+    int maxLen = 1500;//步进0.1dB,0-170dB,一共1700个
+    int i = 0;
+    for (i = 0; i < maxLen; i++)
+    {
+        temp_count += data_num[i];
+        if(temp_count > temp_L5 && stat->L5 <= 0)
+        {
+            stat->L5 = (float)i / 10;
+        }
+        if(temp_count >= temp_L10 && stat->L10 <= 0)
+        {
+            stat->L10 = (float)i / 10;
+        }
+        if(temp_count >= temp_L50 && stat->L50 <= 0)
+        {
+            stat->L50 = (float)i / 10;
+        }
+        if(temp_count >= temp_L90 && stat->L90 <= 0)
+        {
+            stat->L90 = (float)i / 10;
+        }
+        if(temp_count >= temp_L95 && stat->L95 <= 0)
+        {
+            stat->L95 = (float)i / 10;
+        }
+    }
+
+    int ii = maxLen;
+    int total = 0;
+    while((100 * total) / temp_count < 5 && i > 0)
+    {
+        ii--;
+        total += data_num[ii];
+    }
+
+    stat->L5 = (float)(ii) / 10;
+
+    if(i < 1)
+    {
+        stat->L10 = stat->L50 = stat->L90 = stat->L95 = stat->L5;
+    }
+
+    while((100 * total) / temp_count < 10 && i > 0)
+    {
+        ii--;
+        total += data_num[ii];
+
+    }
+    stat->L10 = (float)(ii) / 10;
+    if(i < 1)
+    {
+        stat->L50 = stat->L90 = stat->L95 = stat->L10;
+    }
+
+    while((100 * total) / temp_count < 50 && i > 0)
+    {
+        ii--;
+        total += data_num[ii];
+    }
+
+    stat->L50 = (float)(ii) / 10;
+    if(i < 1)
+    {
+        stat->L90 = stat->L95 = stat->L50;
+    }
+
+    while((100*total) / temp_count < 90 && i > 0)
+    {
+        ii--;
+        total += data_num[ii];
+
+    }
+    stat->L90 = (float)(ii) / 10;
+    if(i < 1)
+    {
+        stat->L95 = stat->L90;
+    }
+
+    while((100 * total) / temp_count < 95 && i > 0)
+    {
+        ii--;
+        total += data_num[ii];
+
+    }
+
+    stat->L95 = (float)(ii) / 10;
+    stat->SD = sd;
+    stat->Lmax = lmax;
+    stat->Lmin = lmin;
+
+    qDebug() << "Code L5:" << stat->L5;
+    qDebug() << "Code L10:" << stat->L10;
+    qDebug() << "Code L50:" << stat->L50;
+    qDebug() << "Code L90:" << stat->L90;
+    qDebug() << "Code L95:" << stat->L95;
+    qDebug() << "Code SD:" << stat->SD;
+}
+
+void AnalyseView::calculateStaDataDLL(LeqStat_S *stat, std::vector<double> data)
+{
     QString pathDll = QString("%1/%2").arg(qApp->applicationDirPath()).arg("MakeAWALib.dll");
     qDebug() << pathDll;
 
@@ -470,17 +631,25 @@ void AnalyseView::calculateTotalData()
     float t = interval * m_plot->leqtDataStd().size();
 
     // 计算最值和统计相关指标
-    if (!m_plot->instData().empty())
+    if (!instData.empty())
     {
         // 计算最值
-        calculateMostValue(&data, m_plot->instDataStd());
+//        calculateMostValue(&data, instData);
 
         // 计算统计数据
-        calculateStaData(&data, m_plot->instDataStd());
+//        calculateStaData(&data, m_plot->instDataStd());
+        calculateStaDataDLL(&data, m_plot->instDataStd());
+//        data.L5 = calculateQuantile(instData, 5);
+//        data.L10 = calculateQuantile(instData, 10);
+//        data.L50 = calculateQuantile(instData, 50);
+//        data.L90 = calculateQuantile(instData, 90);
+//        data.L95 = calculateQuantile(instData, 95);
+//        data.SD = calculateSD(instData);
+//        qDebug() << "sd ======= " << calculateSD(instData);
     }
 
     // 计算 Leq,T
-    calculateLeqT(&data, m_plot->leqtDataStd());
+    calculateLeqT(&data, leqtData);
 
     // 计算 SEL
     calculateSEL(&data, t);
@@ -507,5 +676,35 @@ void AnalyseView::calculateLeqT(LeqStat_S *stat, std::vector<double> data)
 void AnalyseView::calculateSEL(LeqStat_S *stat, float t)
 {
     stat->SEL = stat->LeqT +  10.0 * log10(t);
+}
+
+float AnalyseView::calculateQuantile(std::vector<double> pressures, double percentile)
+{
+    if (pressures.empty())
+    {
+        return 0.0; // 或者返回错误代码
+    }
+
+    std::sort(pressures.begin(), pressures.end());
+    size_t index = static_cast<size_t>(percentile / 100.0 * (pressures.size() - 1));
+    return pressures[index];
+}
+
+float AnalyseView::calculateSD(const std::vector<double> &pressures)
+{
+    double mean = 0.0;
+    for (double p : pressures)
+    {
+        mean += p;
+    }
+    mean /= pressures.size();
+
+    double sumSquared = 0.0;
+    for (double p : pressures)
+    {
+        sumSquared += (p - mean) * (p - mean);
+    }
+
+    return sqrt(sumSquared / pressures.size());
 }
 

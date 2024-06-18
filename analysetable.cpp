@@ -146,8 +146,8 @@ void AnalyseTable::addRow(LeqStat_S &stat)
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.L50, 'f', 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.L90, 'f', 1)));
     this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.L95, 'f', 1)));
-    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(floor(stat.SD * 10) / 10, 'f', 1)));
-    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(floor(stat.SEL * 10) / 10, 'f', 1)));
+    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.SD, 'f', 2)));
+    this->setItem(rowIndex, colIndex++, new QTableWidgetItem(QString::number(stat.SEL, 'f', 1)));
 
     this->item(rowIndex, 0)->setData(Qt::UserRole, stat.uid);
 

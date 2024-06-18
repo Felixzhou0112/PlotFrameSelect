@@ -52,9 +52,12 @@ private:
     QJsonObject analyDataLine(bool isCrossDay,QString dataLine, int cow, int dataCow, QStringList &InstantDataName, QString& measureData);
 
     void calculateStaData(LeqStat_S *stat, std::vector<double> data);
+    void calculateStaDataDLL(LeqStat_S *stat, std::vector<double> data);
     void calculateMostValue(LeqStat_S *stat, std::vector<double> data);
     void calculateLeqT(LeqStat_S *stat, std::vector<double> data);
     void calculateSEL(LeqStat_S *stat, float t);
+    float calculateQuantile(std::vector<double> pressures, double percentile);
+    float calculateSD(const std::vector<double>& pressures);
 
 private:
     AnalysePlot* m_plot = nullptr;
